@@ -1,5 +1,4 @@
 import logging
-from typing import Dict
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -14,15 +13,11 @@ class Settings(BaseSettings):
   DB_USER: str | None = None
   DB_PASSWORD: str | None = None
   DB_SCHEMA: str | None = None
+  DB_PORT: int | None = 3306
 
   @property
-  def db_credentials(self) -> Dict[str, str]:
-    return {
-      "host": self.DB_HOST,
-      "user": self.DB_USER,
-      "password": self.DB_PASSWORD,
-      "schema": self.DB_SCHEMA,
-    }
+  def database_url(self) -> str:
+    return f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_SCHEMA}"
 
   model_config = SettingsConfigDict(env_file=BASE_DIR / ".env")
 
