@@ -1,4 +1,4 @@
-create table `ABS_Users` (
+create table `Users` (
   `id` int unsigned not null auto_increment,
   `email` VARCHAR(50) not null,
   `password` VARCHAR(255) not null,
