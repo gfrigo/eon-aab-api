@@ -7,8 +7,8 @@ class UserCreate(BaseModel):
   password: str
   full_name: str
   profile: Literal["admin", "analista", "visualizador"]
-  
-class UserResponse(BaseModel):
+ 
+class UserCreatedResponse(BaseModel):
   id: int
   email: str
   full_name: str
@@ -16,5 +16,15 @@ class UserResponse(BaseModel):
   is_active: int
   created_at: datetime
   updated_at: datetime
+
+  model_config = {"from_attributes": True}
+
+class LoginRequest(BaseModel):
+  email: EmailStr
+  password: str
+
+class LoginResponse(BaseModel):
+  message: str
+  user: UserCreatedResponse
 
   model_config = {"from_attributes": True}
