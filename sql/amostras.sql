@@ -1,24 +1,23 @@
-CREATE TABLE amostras (
-  ams_id            CHAR(36)    NOT NULL,
-  ams_codigo        VARCHAR(20) NOT NULL,
-  ams_criado_por    CHAR(36)    NOT NULL,
-  ams_analisado_por CHAR(36)    NULL,
-  ams_tier          TINYINT     NULL CHECK (ams_tier IN (1, 2, 3)),
-  ams_tier_label    VARCHAR(20) NULL,
-  ams_status        ENUM('pendente','processando','concluido','rejeitado')
-                                NOT NULL DEFAULT 'pendente',
-  ams_coletado_em   DATETIME    NOT NULL,
-  ams_analisado_em  DATETIME    NULL,
-  ams_criado_em     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `Samples` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `code` varchar(20) NOT NULL,
+  `created_by` int unsigned NOT NULL,
+  `analyzed_by` int unsigned NULL,
+  `tier` tinyint NULL CHECK (`tier` IN (1, 2, 3)),
+  `tier_label` varchar(20) NULL,
+  `status` enum('pendente','processando','concluido','rejeitado') NOT NULL DEFAULT 'pendente',
+  `collected_at` datetime NOT NULL,
+  `analyzed_at` datetime NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  CONSTRAINT pk_amostras          PRIMARY KEY (ams_id),
-  CONSTRAINT uq_ams_codigo        UNIQUE (ams_codigo),
-  CONSTRAINT fk_ams_criado_por    FOREIGN KEY (ams_criado_por)
-    REFERENCES usuarios (usr_id) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT fk_ams_analisado_por FOREIGN KEY (ams_analisado_por)
-    REFERENCES usuarios (usr_id) ON DELETE SET NULL ON UPDATE CASCADE,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_code` (`code`),
+  CONSTRAINT `fk_samples_created_by` FOREIGN KEY (`created_by`)
+    REFERENCES `Users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_samples_analyzed_by` FOREIGN KEY (`analyzed_by`)
+    REFERENCES `Users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
 
-  INDEX idx_ams_status     (ams_status),
-  INDEX idx_ams_tier       (ams_tier),
-  INDEX idx_ams_criado_em  (ams_criado_em)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  INDEX `idx_status` (`status`),
+  INDEX `idx_tier` (`tier`),
+  INDEX `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

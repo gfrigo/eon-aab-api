@@ -1,15 +1,14 @@
-CREATE TABLE configuracoes_perfil (
-  prf_id               CHAR(36)    NOT NULL,
-  prf_usr_id           CHAR(36)    NOT NULL,
-  prf_idioma           VARCHAR(10) NOT NULL DEFAULT 'pt-BR',
-  prf_fuso_horario     VARCHAR(50) NOT NULL DEFAULT 'America/Sao_Paulo',
-  prf_pref_notificacao VARCHAR(20) NOT NULL DEFAULT 'email',
-  prf_preferencias_ui  JSON        NULL,
-  prf_atualizado_em    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                   ON UPDATE CURRENT_TIMESTAMP,
+CREATE TABLE `ProfileSettings` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int unsigned NOT NULL,
+  `language` varchar(10) NOT NULL DEFAULT 'pt-BR',
+  `timezone` varchar(50) NOT NULL DEFAULT 'America/Sao_Paulo',
+  `notification_pref` varchar(20) NOT NULL DEFAULT 'email',
+  `ui_preferences` json NULL,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-  CONSTRAINT pk_configuracoes_perfil PRIMARY KEY (prf_id),
-  CONSTRAINT uq_prf_usr_id           UNIQUE (prf_usr_id),
-  CONSTRAINT fk_prf_usr              FOREIGN KEY (prf_usr_id)
-    REFERENCES usuarios (usr_id) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_user_id` (`user_id`),
+  CONSTRAINT `fk_profilesettings_user` FOREIGN KEY (`user_id`)
+    REFERENCES `Users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

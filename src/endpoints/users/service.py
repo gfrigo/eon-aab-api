@@ -37,3 +37,21 @@ def login_user(db:Session, data:LoginRequest) -> User:
     raise ValueError("Usuário inativo.")
 
   return user
+
+def get_all_users(db: Session, skip: int = 0, limit: int = 100) -> list[User]:
+  return repository.get_all_users(db, skip, limit)
+
+def update_avatar(db: Session, user_id: int, avatar_url: str):
+  return repository.update_avatar(db, user_id, avatar_url)
+
+def update_user(db: Session, user_id: int, data) -> User:
+  user = repository.update_user(db, user_id, data.model_dump(exclude_unset=True))
+  if not user: raise ValueError("Usuário não encontrado.")
+  return user
+
+def delete_user(db: Session, user_id: int):
+  success = repository.delete_user(db, user_id)
+  if not success: raise ValueError("Usuário não encontrado.")
+
+def update_avatar(db: Session, user_id: int, avatar_url: str):
+  return repository.update_avatar(db, user_id, avatar_url)

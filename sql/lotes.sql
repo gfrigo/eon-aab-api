@@ -1,15 +1,15 @@
-CREATE TABLE lotes (
-  lot_id             CHAR(36)    NOT NULL,
-  lot_criado_por     CHAR(36)    NOT NULL,
-  lot_codigo         VARCHAR(20) NOT NULL,
-  lot_total_amostras INT         NOT NULL DEFAULT 0,
-  lot_qtd_tier1      INT         NOT NULL DEFAULT 0,
-  lot_qtd_tier2      INT         NOT NULL DEFAULT 0,
-  lot_qtd_tier3      INT         NOT NULL DEFAULT 0,
-  lot_criado_em      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE `Batches` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int unsigned NOT NULL,
+  `code` varchar(20) NOT NULL,
+  `total_samples` int NOT NULL DEFAULT 0,
+  `tier1_count` int NOT NULL DEFAULT 0,
+  `tier2_count` int NOT NULL DEFAULT 0,
+  `tier3_count` int NOT NULL DEFAULT 0,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  CONSTRAINT pk_lotes          PRIMARY KEY (lot_id),
-  CONSTRAINT uq_lot_codigo     UNIQUE (lot_codigo),
-  CONSTRAINT fk_lot_criado_por FOREIGN KEY (lot_criado_por)
-    REFERENCES usuarios (usr_id) ON DELETE RESTRICT ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_code` (`code`),
+  CONSTRAINT `fk_batches_user` FOREIGN KEY (`user_id`)
+    REFERENCES `Users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
