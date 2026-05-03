@@ -5,6 +5,7 @@ import os
 
 from src.endpoints.users.router import router as users_router
 from src.endpoints.samples.router import router as samples_router
+from src.endpoints.batches import router as batches_router
 
 app = FastAPI()
 
@@ -22,3 +23,4 @@ app.add_middleware(
 
 app.include_router(users_router)
 app.include_router(samples_router)
+app.include_router(batches_router)

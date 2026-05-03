@@ -22,3 +22,12 @@ def get_sample_by_code(db: Session, code: str) -> dict:
     )
   return result
 
+def get_gallery(db: Session) -> list:
+  return repository.get_gallery_data(db)
+
+def get_rasp_status(db: Session) -> dict:
+  return repository.get_rasp_status(db)
+
+def get_pending_count(db: Session) -> dict:
+  return repository.get_pending_count(db)
+

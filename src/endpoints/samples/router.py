@@ -2,7 +2,10 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from src.core.dependencies import get_db
-from src.endpoints.samples.schema import SampleCreate, SampleResponse, DashboardResponse, SampleWithFileResponse
+from src.endpoints.samples.schema import (
+  SampleCreate, SampleResponse, DashboardResponse, SampleWithImageResponse,
+  GalleryItemResponse, RaspStatusResponse, PendingCountResponse,
+)
 from src.endpoints.samples import service
 
 router = APIRouter(prefix="/samples", tags=["Samples"])
@@ -11,7 +14,7 @@ router = APIRouter(prefix="/samples", tags=["Samples"])
 def get_dashboard(db: Session = Depends(get_db)):
   return service.get_dashboard(db)
 
-@router.get("/by-code/{code}", response_model=SampleWithFileResponse)
+@router.get("/by-code/{code}", response_model=SampleWithImageResponse)
 def get_sample_by_code(code: str, db: Session = Depends(get_db)):
   return service.get_sample_by_code(db, code)
 
@@ -22,4 +25,16 @@ def get_samples(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 @router.post("", response_model=SampleResponse, status_code=status.HTTP_201_CREATED)
 def create_sample(data: SampleCreate, db: Session = Depends(get_db)):
   return service.create_sample(db, data)
+
+@router.get("/gallery", response_model=list[GalleryItemResponse])
+def get_gallery(db: Session = Depends(get_db)):
+  return service.get_gallery(db)
+
+@router.get("/rasp-status", response_model=RaspStatusResponse)
+def get_rasp_status(db: Session = Depends(get_db)):
+  return service.get_rasp_status(db)
+
+@router.get("/pending-count", response_model=PendingCountResponse)
+def get_pending_count(db: Session = Depends(get_db)):
+  return service.get_pending_count(db)
 

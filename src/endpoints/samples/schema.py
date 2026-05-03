@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 class SampleCreate(BaseModel):
+  batch_id: int
   code: str
   created_by: int
   collected_at: datetime
@@ -10,9 +11,9 @@ class SampleCreate(BaseModel):
 
 class SampleResponse(BaseModel):
   id: int
+  batch_id: int
   code: str
   created_by: int
-  analyzed_by: Optional[int] = None
   tier: Optional[int] = None
   tier_label: Optional[str] = None
   status: str
@@ -22,19 +23,42 @@ class SampleResponse(BaseModel):
 
   model_config = {"from_attributes": True}
 
-class SampleWithFileResponse(BaseModel):
+class SampleWithImageResponse(BaseModel):
   id: int
+  batch_id: int
   code: str
   status: str
   tier: Optional[int] = None
   tier_label: Optional[str] = None
   created_by: int
-  analyzed_by: Optional[int] = None
   collected_at: datetime
   analyzed_at: Optional[datetime] = None
   created_at: datetime
-  file_url: Optional[str] = None       # URL servida pelo /uploads/
-  file_name: Optional[str] = None
+  image_url: Optional[str] = None
+  confidence_score: Optional[float] = None
+  prediction: Optional[str] = None
+  model_version: Optional[str] = None
+
+class GalleryItemResponse(BaseModel):
+  id: int
+  code: str
+  tier: Optional[int] = None
+  tier_label: Optional[str] = None
+  status: str
+  confidence_score: float
+  prediction: Optional[str] = None
+  image_url: str
+  processed_at: datetime
+
+class RaspStatusResponse(BaseModel):
+  is_online: bool
+  last_seen: Optional[datetime] = None
+  minutes_ago: Optional[int] = None
+
+class PendingCountResponse(BaseModel):
+  processing: int
+  pending: int
+  total: int
 
 class DashboardStatsResponse(BaseModel):
   processed_samples: int

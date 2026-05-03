@@ -1,6 +1,7 @@
 CREATE TABLE `SampleResults` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `sample_id` int unsigned NOT NULL,
+  `image_path` varchar(500) NOT NULL,
   `confidence_score` float NOT NULL CHECK (`confidence_score` BETWEEN 0.0 AND 1.0),
   `ml_raw_output` json NOT NULL,
   `model_version` varchar(50) NOT NULL,
