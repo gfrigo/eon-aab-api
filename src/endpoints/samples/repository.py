@@ -101,9 +101,10 @@ def get_dashboard_data(db: Session) -> dict:
 
       prediction = "Análise Pendente"
       if result:
-          prediction = "Anomalia Detectada" if result.confidence_score < 0.8 else "Normal"
           if result.ml_raw_output and "predicted_class" in result.ml_raw_output:
               prediction = result.ml_raw_output["predicted_class"]
+          elif result.confidence_score is not None:
+              prediction = "Anomalia Detectada" if result.confidence_score < 0.8 else "Normal"
 
       sample_type = sample.tier_label or "Análise Padrão"
       type_class = "badge-blood"
@@ -173,7 +174,8 @@ def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
     created_by=RASP_USER_ID,
     tier=tier_num,
     tier_label=tier_label,
-    status="pendente",
+    status="concluido",
+    analyzed_at=now,
     collected_at=data.collected_at,
     created_at=now,
   )
@@ -184,6 +186,9 @@ def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
   result = SampleResult(
     sample_id=sample.id,
     image_path=data.gcp_url,
+    confidence_score=1.0,
+    ml_raw_output={"predicted_class": tier_label},
+    model_version="operator-v1",
     processed_at=now,
   )
   db.add(result)
