@@ -30,7 +30,8 @@ def get_by_code(db: Session, code: str) -> dict | None:
 
   image_url = None
   if sample_result and sample_result.image_path:
-    image_url = f"/uploads/{sample_result.image_path}"
+    p = sample_result.image_path
+    image_url = p if p.startswith("http") else f"/uploads/{p}"
 
   prediction = None
   if sample_result and sample_result.ml_raw_output:
@@ -96,7 +97,7 @@ def get_dashboard_data(db: Session) -> dict:
 
   recent_samples = []
   for sample, result in recent_query:
-      confidence = int(result.confidence_score * 100) if result else 0
+      confidence = int(result.confidence_score * 100) if (result and result.confidence_score is not None) else 0
 
       prediction = "Análise Pendente"
       if result:
@@ -155,6 +156,12 @@ def get_or_create_daily_batch(db: Session) -> Batch:
     db.refresh(batch)
   return batch
 
+def _generate_sample_code(db: Session) -> str:
+  year = datetime.now(timezone.utc).year
+  prefix = f"SMP-{year}-"
+  count = db.query(Sample).filter(Sample.code.like(f"{prefix}%")).count()
+  return f"{prefix}{count + 1:03d}"
+
 def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
   tier_num, tier_label = TIER_MAP.get(data.tier, (None, data.tier))
   batch = get_or_create_daily_batch(db)
@@ -162,7 +169,7 @@ def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
 
   sample = Sample(
     batch_id=batch.id,
-    code=data.photo_id,
+    code=_generate_sample_code(db),
     created_by=RASP_USER_ID,
     tier=tier_num,
     tier_label=tier_label,
