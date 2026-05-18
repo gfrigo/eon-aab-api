@@ -15,6 +15,13 @@ class RaspSampleCreate(BaseModel):
   gcp_url: str
   collected_at: datetime
 
+class RecentSampleResponse(BaseModel):
+  code: str
+  tier_label: Optional[str] = None
+  tier: Optional[int] = None
+  image_url: Optional[str] = None
+  collected_at: datetime
+
 class SampleResponse(BaseModel):
   id: int
   batch_id: int

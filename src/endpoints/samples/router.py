@@ -5,6 +5,7 @@ from src.core.dependencies import get_db
 from src.endpoints.samples.schema import (
   SampleCreate, SampleResponse, DashboardResponse, SampleWithImageResponse,
   GalleryItemResponse, RaspStatusResponse, PendingCountResponse, RaspSampleCreate,
+  RecentSampleResponse,
 )
 from src.endpoints.samples import service
 
@@ -41,4 +42,8 @@ def get_pending_count(db: Session = Depends(get_db)):
 @router.post("/rasp", response_model=SampleResponse, status_code=status.HTTP_201_CREATED)
 def create_rasp_sample(data: RaspSampleCreate, db: Session = Depends(get_db)):
   return service.create_rasp_sample(db, data)
+
+@router.get("/recent", response_model=list[RecentSampleResponse])
+def get_recent(db: Session = Depends(get_db)):
+  return service.get_recent_rasp_samples(db)
 

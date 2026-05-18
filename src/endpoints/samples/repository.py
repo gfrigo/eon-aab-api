@@ -242,6 +242,30 @@ def get_rasp_status(db: Session) -> dict:
     "minutes_ago": minutes_ago,
   }
 
+def get_recent_rasp_samples(db: Session, limit: int = 5) -> list[dict]:
+  results = (
+    db.query(Sample, SampleResult)
+    .outerjoin(SampleResult, SampleResult.sample_id == Sample.id)
+    .filter(Sample.created_by == RASP_USER_ID)
+    .order_by(Sample.created_at.desc())
+    .limit(limit)
+    .all()
+  )
+  items = []
+  for sample, result in results:
+    image_url = None
+    if result and result.image_path:
+      p = result.image_path
+      image_url = p if p.startswith("http") else f"/uploads/{p}"
+    items.append({
+      "code": sample.code,
+      "tier_label": sample.tier_label,
+      "tier": sample.tier,
+      "image_url": image_url,
+      "collected_at": sample.collected_at,
+    })
+  return items
+
 def get_pending_count(db: Session) -> dict:
   processing = db.query(Sample).filter(Sample.status == "processando").count()
   pending    = db.query(Sample).filter(Sample.status == "pendente").count()

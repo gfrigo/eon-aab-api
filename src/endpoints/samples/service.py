@@ -34,3 +34,6 @@ def get_pending_count(db: Session) -> dict:
 def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
   return repository.create_rasp_sample(db, data)
 
+def get_recent_rasp_samples(db: Session) -> list:
+  return repository.get_recent_rasp_samples(db)
+
