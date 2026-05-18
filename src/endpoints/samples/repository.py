@@ -1,8 +1,16 @@
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from src.endpoints.samples.model import Sample, SampleResult
-from src.endpoints.samples.schema import SampleCreate
+from src.endpoints.samples.model import Sample, SampleResult, Batch
+from src.endpoints.samples.schema import SampleCreate, RaspSampleCreate
+
+RASP_USER_ID = 5
+
+TIER_MAP = {
+  "bom":     (1, "bom"),
+  "ruim":    (2, "ruim"),
+  "pessimo": (3, "pessimo"),
+}
 
 def get_all(db: Session, skip: int = 0, limit: int = 100) -> list[Sample]:
   return db.query(Sample).offset(skip).limit(limit).all()
@@ -136,16 +144,59 @@ def get_dashboard_data(db: Session) -> dict:
       "recent_samples": recent_samples
   }
 
+def get_or_create_daily_batch(db: Session) -> Batch:
+  today = datetime.now(timezone.utc).strftime("%Y%m%d")
+  code = f"RASP-{today}"
+  batch = db.query(Batch).filter(Batch.code == code).first()
+  if not batch:
+    batch = Batch(user_id=RASP_USER_ID, code=code, created_at=datetime.now(timezone.utc))
+    db.add(batch)
+    db.commit()
+    db.refresh(batch)
+  return batch
+
+def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
+  tier_num, tier_label = TIER_MAP.get(data.tier, (None, data.tier))
+  batch = get_or_create_daily_batch(db)
+  now = datetime.now(timezone.utc)
+
+  sample = Sample(
+    batch_id=batch.id,
+    code=data.photo_id,
+    created_by=RASP_USER_ID,
+    tier=tier_num,
+    tier_label=tier_label,
+    status="pendente",
+    collected_at=data.collected_at,
+    created_at=now,
+  )
+  db.add(sample)
+  db.commit()
+  db.refresh(sample)
+
+  result = SampleResult(
+    sample_id=sample.id,
+    image_path=data.gcp_url,
+    processed_at=now,
+  )
+  db.add(result)
+  db.commit()
+
+  return sample
+
 def get_gallery_data(db: Session) -> list[dict]:
   results = (
     db.query(Sample, SampleResult)
-    .join(SampleResult, SampleResult.sample_id == Sample.id)
-    .order_by(SampleResult.processed_at.desc())
+    .outerjoin(SampleResult, SampleResult.sample_id == Sample.id)
+    .order_by(Sample.created_at.desc())
     .all()
   )
   gallery = []
   for sample, result in results:
+    if not result:
+      continue
     prediction = result.ml_raw_output.get("predicted_class") if result.ml_raw_output else None
+    image_url = result.image_path if result.image_path.startswith("http") else f"/uploads/{result.image_path}"
     gallery.append({
       "id": sample.id,
       "code": sample.code,
@@ -154,17 +205,22 @@ def get_gallery_data(db: Session) -> list[dict]:
       "status": sample.status,
       "confidence_score": result.confidence_score,
       "prediction": prediction,
-      "image_url": f"/uploads/{result.image_path}",
+      "image_url": image_url,
       "processed_at": result.processed_at,
     })
   return gallery
 
 def get_rasp_status(db: Session) -> dict:
   from datetime import timezone as tz
-  last = db.query(SampleResult).order_by(SampleResult.processed_at.desc()).first()
+  last = (
+    db.query(Sample)
+    .filter(Sample.created_by == RASP_USER_ID)
+    .order_by(Sample.created_at.desc())
+    .first()
+  )
   if not last:
     return {"is_online": False, "last_seen": None, "minutes_ago": None}
-  last_seen = last.processed_at
+  last_seen = last.created_at
   if last_seen.tzinfo is None:
     last_seen = last_seen.replace(tzinfo=tz.utc)
   minutes_ago = int((datetime.now(tz.utc) - last_seen).total_seconds() / 60)

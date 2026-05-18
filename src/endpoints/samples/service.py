@@ -1,7 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from src.endpoints.samples.model import Sample
-from src.endpoints.samples.schema import SampleCreate
+from src.endpoints.samples.schema import SampleCreate, RaspSampleCreate
 from src.endpoints.samples import repository
 
 def get_samples(db: Session, skip: int = 0, limit: int = 100) -> list[Sample]:
@@ -30,4 +30,7 @@ def get_rasp_status(db: Session) -> dict:
 
 def get_pending_count(db: Session) -> dict:
   return repository.get_pending_count(db)
+
+def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
+  return repository.create_rasp_sample(db, data)
 

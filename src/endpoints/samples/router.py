@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from src.core.dependencies import get_db
 from src.endpoints.samples.schema import (
   SampleCreate, SampleResponse, DashboardResponse, SampleWithImageResponse,
-  GalleryItemResponse, RaspStatusResponse, PendingCountResponse,
+  GalleryItemResponse, RaspStatusResponse, PendingCountResponse, RaspSampleCreate,
 )
 from src.endpoints.samples import service
 
@@ -37,4 +37,8 @@ def get_rasp_status(db: Session = Depends(get_db)):
 @router.get("/pending-count", response_model=PendingCountResponse)
 def get_pending_count(db: Session = Depends(get_db)):
   return service.get_pending_count(db)
+
+@router.post("/rasp", response_model=SampleResponse, status_code=status.HTTP_201_CREATED)
+def create_rasp_sample(data: RaspSampleCreate, db: Session = Depends(get_db)):
+  return service.create_rasp_sample(db, data)
 

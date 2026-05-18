@@ -9,6 +9,12 @@ class SampleCreate(BaseModel):
   collected_at: datetime
   tier_label: Optional[str] = None
 
+class RaspSampleCreate(BaseModel):
+  photo_id: str
+  tier: str          # "bom" | "ruim" | "pessimo"
+  gcp_url: str
+  collected_at: datetime
+
 class SampleResponse(BaseModel):
   id: int
   batch_id: int
@@ -45,7 +51,7 @@ class GalleryItemResponse(BaseModel):
   tier: Optional[int] = None
   tier_label: Optional[str] = None
   status: str
-  confidence_score: float
+  confidence_score: Optional[float] = None
   prediction: Optional[str] = None
   image_url: str
   processed_at: datetime
