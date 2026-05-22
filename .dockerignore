@@ -1,0 +1,13 @@
+.git
+.env
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+tests/
+uploads/
+.venv
+poetry.lock
+README.md
+Makefile
+sql/
