@@ -88,6 +88,7 @@ class DashboardSampleItem(BaseModel):
   typeClass: str
   patient: str
   prediction: str
+  doctor: Optional[str] = None
   confidence: int
   status: str
   statusClass: str

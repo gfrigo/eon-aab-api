@@ -97,39 +97,28 @@ def get_dashboard_data(db: Session) -> dict:
 
   recent_samples = []
   for sample, result in recent_query:
-      confidence = int(result.confidence_score * 100) if (result and result.confidence_score is not None) else 0
-
       prediction = "Análise Pendente"
-      if result:
-          if result.ml_raw_output and "predicted_class" in result.ml_raw_output:
-              prediction = result.ml_raw_output["predicted_class"]
-          elif result.confidence_score is not None:
-              prediction = "Anomalia Detectada" if result.confidence_score < 0.8 else "Normal"
+      doctor = "—"
+      if result and result.ml_raw_output:
+          prediction = result.ml_raw_output.get("predicted_class", "Análise Pendente")
+          doctor = result.ml_raw_output.get("doctor") or "—"
 
       sample_type = sample.tier_label or "Análise Padrão"
-      type_class = "badge-blood"
-      if "Sangue" in sample_type or "Blood" in sample_type:
-          type_class = "badge-blood"
-      elif "Tecido" in sample_type or "Tissue" in sample_type or "Biópsia" in sample_type:
-          type_class = "badge-tissue"
-      elif "RM" in sample_type or "Scan" in sample_type:
-          type_class = "badge-scan"
 
       status_class = "status-processing"
       if sample.status == "concluido":
           status_class = "status-completed"
       elif sample.status == "rejeitado":
           status_class = "status-flagged"
-      elif result and result.confidence_score < 0.8:
-          status_class = "status-flagged"
 
       recent_samples.append({
           "id": sample.code,
           "type": sample_type,
-          "typeClass": type_class,
+          "typeClass": "badge-blood",
           "patient": f"PT-{sample.created_by}",
           "prediction": prediction,
-          "confidence": confidence,
+          "doctor": doctor,
+          "confidence": 0,
           "status": sample.status.capitalize(),
           "statusClass": status_class
       })
