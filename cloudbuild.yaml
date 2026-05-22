@@ -1,0 +1,9 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'southamerica-east1-docker.pkg.dev/project-13fcc269-a732-4c98-b00/cloud-run-source-deploy/eon-aab-api', '.']
+
+images:
+  - 'southamerica-east1-docker.pkg.dev/project-13fcc269-a732-4c98-b00/cloud-run-source-deploy/eon-aab-api'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
