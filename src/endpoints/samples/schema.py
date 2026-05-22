@@ -14,6 +14,7 @@ class RaspSampleCreate(BaseModel):
   tier: str          # "bom" | "ruim" | "pessimo"
   gcp_url: str
   collected_at: datetime
+  doctor_name: Optional[str] = None
 
 class RecentSampleResponse(BaseModel):
   code: str
