@@ -1,8 +1,11 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta, date as date_type
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from src.endpoints.samples.model import Sample, SampleResult, Batch
 from src.endpoints.samples.schema import SampleCreate, RaspSampleCreate
+
+# Fuso horário do Brasil (UTC-3)
+BRAZIL_TZ = timezone(timedelta(hours=-3))
 
 RASP_USER_ID = 5
 
@@ -136,8 +139,26 @@ def get_dashboard_data(db: Session) -> dict:
   }
 
 def get_or_create_daily_batch(db: Session) -> Batch:
-  today = datetime.now(timezone.utc).strftime("%Y%m%d")
-  code = f"RASP-{today}"
+  """
+  Cria/retorna o lote do turno atual:
+    Diurno  (D): 06:00–17:59 (horário Brasil UTC-3)
+    Noturno (N): 18:00–05:59 (horário Brasil UTC-3)
+  """
+  now_local = datetime.now(BRAZIL_TZ)
+  hour = now_local.hour
+
+  if 6 <= hour < 18:
+    shift = "D"
+    date_str = now_local.strftime("%Y%m%d")
+  else:
+    shift = "N"
+    # 00:00-05:59 local → ainda é turno noturno que começou ontem
+    if 0 <= hour < 6:
+      date_str = (now_local - timedelta(days=1)).strftime("%Y%m%d")
+    else:
+      date_str = now_local.strftime("%Y%m%d")
+
+  code = f"RASP-{date_str}-{shift}"
   batch = db.query(Batch).filter(Batch.code == code).first()
   if not batch:
     batch = Batch(user_id=RASP_USER_ID, code=code, created_at=datetime.now(timezone.utc))
@@ -259,3 +280,53 @@ def get_pending_count(db: Session) -> dict:
   processing = db.query(Sample).filter(Sample.status == "processando").count()
   pending    = db.query(Sample).filter(Sample.status == "pendente").count()
   return {"processing": processing, "pending": pending, "total": processing + pending}
+
+def get_time_series(db: Session, days: int = 14) -> list[dict]:
+  """Retorna contagem de amostras por dia nos últimos N dias, agrupadas por tier."""
+  today = date_type.today()
+  result = []
+  for i in range(days - 1, -1, -1):
+    d = today - timedelta(days=i)
+    d_str = d.strftime('%Y-%m-%d')
+    bom     = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == 1).count()
+    ruim    = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == 2).count()
+    pessimo = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == 3).count()
+    sem_tier = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == None).count()
+    result.append({
+      "date": d_str,
+      "total": bom + ruim + pessimo + sem_tier,
+      "bom": bom,
+      "ruim": ruim,
+      "pessimo": pessimo,
+    })
+  return result
+
+def get_rasp_log(db: Session, limit: int = 20) -> list[dict]:
+  """Retorna os últimos N registros enviados pelo Raspberry Pi com detalhes."""
+  results = (
+    db.query(Sample, SampleResult)
+    .outerjoin(SampleResult, SampleResult.sample_id == Sample.id)
+    .filter(Sample.created_by == RASP_USER_ID)
+    .order_by(Sample.created_at.desc())
+    .limit(limit)
+    .all()
+  )
+  items = []
+  for sample, result in results:
+    doctor = None
+    if result and result.ml_raw_output:
+      doctor = result.ml_raw_output.get("doctor")
+    image_url = None
+    if result and result.image_path:
+      p = result.image_path
+      image_url = p if p.startswith("http") else f"/uploads/{p}"
+    items.append({
+      "code": sample.code,
+      "tier": sample.tier,
+      "tier_label": sample.tier_label,
+      "doctor": doctor,
+      "image_url": image_url,
+      "collected_at": sample.collected_at,
+      "created_at": sample.created_at,
+    })
+  return items

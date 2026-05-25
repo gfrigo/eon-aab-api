@@ -74,6 +74,22 @@ class PendingCountResponse(BaseModel):
   pending: int
   total: int
 
+class TimeSeriesItem(BaseModel):
+  date: str
+  total: int
+  bom: int
+  ruim: int
+  pessimo: int
+
+class RaspLogItem(BaseModel):
+  code: str
+  tier: Optional[int] = None
+  tier_label: Optional[str] = None
+  doctor: Optional[str] = None
+  image_url: Optional[str] = None
+  collected_at: datetime
+  created_at: datetime
+
 class DashboardStatsResponse(BaseModel):
   processed_samples: int
   confidence_score: float

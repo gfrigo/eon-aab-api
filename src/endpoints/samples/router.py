@@ -5,7 +5,7 @@ from src.core.dependencies import get_db
 from src.endpoints.samples.schema import (
   SampleCreate, SampleResponse, DashboardResponse, SampleWithImageResponse,
   GalleryItemResponse, RaspStatusResponse, PendingCountResponse, RaspSampleCreate,
-  RecentSampleResponse,
+  RecentSampleResponse, TimeSeriesItem, RaspLogItem,
 )
 from src.endpoints.samples import service
 
@@ -46,4 +46,12 @@ def create_rasp_sample(data: RaspSampleCreate, db: Session = Depends(get_db)):
 @router.get("/recent", response_model=list[RecentSampleResponse])
 def get_recent(db: Session = Depends(get_db)):
   return service.get_recent_rasp_samples(db)
+
+@router.get("/time-series", response_model=list[TimeSeriesItem])
+def get_time_series(days: int = 14, db: Session = Depends(get_db)):
+  return service.get_time_series(db, days)
+
+@router.get("/rasp-log", response_model=list[RaspLogItem])
+def get_rasp_log(limit: int = 20, db: Session = Depends(get_db)):
+  return service.get_rasp_log(db, limit)
 

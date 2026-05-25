@@ -37,3 +37,9 @@ def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
 def get_recent_rasp_samples(db: Session) -> list:
   return repository.get_recent_rasp_samples(db)
 
+def get_time_series(db: Session, days: int = 14) -> list:
+  return repository.get_time_series(db, days)
+
+def get_rasp_log(db: Session, limit: int = 20) -> list:
+  return repository.get_rasp_log(db, limit)
+
