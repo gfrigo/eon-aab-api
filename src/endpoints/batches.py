@@ -40,6 +40,20 @@ def list_batches(db: Session = Depends(get_db)):
         })
     return result
 
+@router.delete("/{batch_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_batch(batch_id: int, db: Session = Depends(get_db)):
+    """Remove um lote e todas as amostras/resultados associados."""
+    from src.endpoints.samples.model import SampleResult
+    batch = db.query(Batch).filter(Batch.id == batch_id).first()
+    if not batch:
+        raise HTTPException(status_code=404, detail="Lote não encontrado.")
+    samples = db.query(Sample).filter(Sample.batch_id == batch_id).all()
+    for sample in samples:
+        db.query(SampleResult).filter(SampleResult.sample_id == sample.id).delete()
+    db.query(Sample).filter(Sample.batch_id == batch_id).delete()
+    db.delete(batch)
+    db.commit()
+
 @router.post("", response_model=BatchResponse, status_code=status.HTTP_201_CREATED)
 def create_batch(data: BatchCreate, db: Session = Depends(get_db)):
     existing = db.query(Batch).filter(Batch.code == data.code).first()
