@@ -81,7 +81,10 @@ def get_dashboard_data(db: Session) -> dict:
   avg_conf = db.query(func.avg(SampleResult.confidence_score)).scalar() or 0.0
   confidence_percentage = round(avg_conf * 100, 1)
 
-  anomalies = db.query(SampleResult).filter(SampleResult.confidence_score < 0.8).count()
+  anomalies = db.query(SampleResult).filter(
+    SampleResult.confidence_score != None,
+    SampleResult.confidence_score < 0.8,
+  ).count()
   avg_time = 1.2
 
   daily_reads = db.query(Sample).filter(func.date(Sample.created_at) == today_str).count()
@@ -89,6 +92,26 @@ def get_dashboard_data(db: Session) -> dict:
       func.date(Sample.created_at) == today_str,
       Sample.status == "rejeitado"
   ).count()
+
+  # Leituras de ontem (para tendência)
+  yesterday_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime('%Y-%m-%d')
+  yesterday_reads = db.query(Sample).filter(func.date(Sample.created_at) == yesterday_str).count()
+
+  # Contagem por tier (total histórico)
+  tier_bom     = db.query(Sample).filter(Sample.tier == 1).count()
+  tier_ruim    = db.query(Sample).filter(Sample.tier == 2).count()
+  tier_pessimo = db.query(Sample).filter(Sample.tier == 3).count()
+
+  # Turno e lote ativo
+  now_local  = datetime.now(BRAZIL_TZ)
+  hour_local = now_local.hour
+  if 6 <= hour_local < 18:
+    shift, current_shift = "D", "Diurno"
+    shift_date = now_local.strftime("%Y%m%d")
+  else:
+    shift, current_shift = "N", "Noturno"
+    shift_date = (now_local - timedelta(days=1)).strftime("%Y%m%d") if 0 <= hour_local < 6 else now_local.strftime("%Y%m%d")
+  current_batch = f"RASP-{shift_date}-{shift}"
 
   recent_query = (
     db.query(Sample, SampleResult)
@@ -133,7 +156,13 @@ def get_dashboard_data(db: Session) -> dict:
           "anomalies_detected": anomalies,
           "avg_processing_time": avg_time,
           "daily_reads": daily_reads,
-          "daily_rejections": daily_rejections
+          "daily_rejections": daily_rejections,
+          "tier_bom": tier_bom,
+          "tier_ruim": tier_ruim,
+          "tier_pessimo": tier_pessimo,
+          "yesterday_reads": yesterday_reads,
+          "current_batch": current_batch,
+          "current_shift": current_shift,
       },
       "recent_samples": recent_samples
   }
@@ -330,3 +359,25 @@ def get_rasp_log(db: Session, limit: int = 20) -> list[dict]:
       "created_at": sample.created_at,
     })
   return items
+
+def get_doctor_stats(db: Session) -> list[dict]:
+  """Retorna contagem de amostras por médico, ordenado por volume."""
+  rows = db.query(SampleResult.ml_raw_output).filter(SampleResult.ml_raw_output != None).all()
+  counts: dict[str, int] = {}
+  for (raw,) in rows:
+    if raw:
+      doc = raw.get("doctor")
+      if doc and doc not in ("—", "", None):
+        counts[doc] = counts.get(doc, 0) + 1
+  return [{"doctor": k, "count": v} for k, v in sorted(counts.items(), key=lambda x: -x[1])]
+
+def delete_by_code(db: Session, code: str) -> bool:
+  """Remove uma amostra e seu resultado associado pelo código."""
+  sample = db.query(Sample).filter(Sample.code == code).first()
+  if not sample:
+    return False
+  # Remove SampleResult primeiro (sem cascade automático)
+  db.query(SampleResult).filter(SampleResult.sample_id == sample.id).delete()
+  db.delete(sample)
+  db.commit()
+  return True

@@ -5,7 +5,7 @@ from src.core.dependencies import get_db
 from src.endpoints.samples.schema import (
   SampleCreate, SampleResponse, DashboardResponse, SampleWithImageResponse,
   GalleryItemResponse, RaspStatusResponse, PendingCountResponse, RaspSampleCreate,
-  RecentSampleResponse, TimeSeriesItem, RaspLogItem,
+  RecentSampleResponse, TimeSeriesItem, RaspLogItem, DoctorStatItem,
 )
 from src.endpoints.samples import service
 
@@ -18,6 +18,13 @@ def get_dashboard(db: Session = Depends(get_db)):
 @router.get("/by-code/{code}", response_model=SampleWithImageResponse)
 def get_sample_by_code(code: str, db: Session = Depends(get_db)):
   return service.get_sample_by_code(db, code)
+
+@router.delete("/by-code/{code}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_sample_by_code(code: str, db: Session = Depends(get_db)):
+  deleted = service.delete_sample_by_code(db, code)
+  if not deleted:
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail=f"Amostra '{code}' não encontrada.")
 
 @router.get("", response_model=list[SampleResponse])
 def get_samples(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -54,4 +61,8 @@ def get_time_series(days: int = 14, db: Session = Depends(get_db)):
 @router.get("/rasp-log", response_model=list[RaspLogItem])
 def get_rasp_log(limit: int = 20, db: Session = Depends(get_db)):
   return service.get_rasp_log(db, limit)
+
+@router.get("/doctor-stats", response_model=list[DoctorStatItem])
+def get_doctor_stats(db: Session = Depends(get_db)):
+  return service.get_doctor_stats(db)
 

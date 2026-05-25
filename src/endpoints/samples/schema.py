@@ -97,6 +97,12 @@ class DashboardStatsResponse(BaseModel):
   avg_processing_time: float
   daily_reads: int
   daily_rejections: int
+  tier_bom: int = 0
+  tier_ruim: int = 0
+  tier_pessimo: int = 0
+  yesterday_reads: int = 0
+  current_batch: Optional[str] = None
+  current_shift: Optional[str] = None
 
 class DashboardSampleItem(BaseModel):
   id: str
@@ -108,6 +114,10 @@ class DashboardSampleItem(BaseModel):
   confidence: int
   status: str
   statusClass: str
+
+class DoctorStatItem(BaseModel):
+  doctor: str
+  count: int
 
 class DashboardResponse(BaseModel):
   stats: DashboardStatsResponse

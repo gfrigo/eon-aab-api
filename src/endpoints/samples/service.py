@@ -43,3 +43,9 @@ def get_time_series(db: Session, days: int = 14) -> list:
 def get_rasp_log(db: Session, limit: int = 20) -> list:
   return repository.get_rasp_log(db, limit)
 
+def delete_sample_by_code(db: Session, code: str) -> bool:
+  return repository.delete_by_code(db, code)
+
+def get_doctor_stats(db: Session) -> list:
+  return repository.get_doctor_stats(db)
+
