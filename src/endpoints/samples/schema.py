@@ -90,6 +90,9 @@ class RaspLogItem(BaseModel):
   collected_at: datetime
   created_at: datetime
 
+class SampleTierUpdate(BaseModel):
+  tier: int  # 1, 2 ou 3
+
 class DashboardStatsResponse(BaseModel):
   processed_samples: int
   confidence_score: float

@@ -371,6 +371,18 @@ def get_doctor_stats(db: Session) -> list[dict]:
         counts[doc] = counts.get(doc, 0) + 1
   return [{"doctor": k, "count": v} for k, v in sorted(counts.items(), key=lambda x: -x[1])]
 
+TIER_INT_TO_LABEL = {1: "bom", 2: "ruim", 3: "pessimo"}
+
+def update_tier(db: Session, code: str, tier: int) -> Sample | None:
+  sample = db.query(Sample).filter(Sample.code == code).first()
+  if not sample:
+    return None
+  sample.tier = tier
+  sample.tier_label = TIER_INT_TO_LABEL.get(tier, str(tier))
+  db.commit()
+  db.refresh(sample)
+  return sample
+
 def delete_by_code(db: Session, code: str) -> bool:
   """Remove uma amostra e seu resultado associado pelo código."""
   sample = db.query(Sample).filter(Sample.code == code).first()

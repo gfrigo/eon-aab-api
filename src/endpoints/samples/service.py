@@ -43,6 +43,12 @@ def get_time_series(db: Session, days: int = 14) -> list:
 def get_rasp_log(db: Session, limit: int = 20) -> list:
   return repository.get_rasp_log(db, limit)
 
+def update_sample_tier(db: Session, code: str, tier: int):
+  result = repository.update_tier(db, code, tier)
+  if result is None:
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Amostra '{code}' não encontrada.")
+  return result
+
 def delete_sample_by_code(db: Session, code: str) -> bool:
   return repository.delete_by_code(db, code)
 

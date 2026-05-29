@@ -5,7 +5,7 @@ from src.core.dependencies import get_db
 from src.endpoints.samples.schema import (
   SampleCreate, SampleResponse, DashboardResponse, SampleWithImageResponse,
   GalleryItemResponse, RaspStatusResponse, PendingCountResponse, RaspSampleCreate,
-  RecentSampleResponse, TimeSeriesItem, RaspLogItem, DoctorStatItem,
+  RecentSampleResponse, TimeSeriesItem, RaspLogItem, DoctorStatItem, SampleTierUpdate,
 )
 from src.endpoints.samples import service
 
@@ -18,6 +18,10 @@ def get_dashboard(db: Session = Depends(get_db)):
 @router.get("/by-code/{code}", response_model=SampleWithImageResponse)
 def get_sample_by_code(code: str, db: Session = Depends(get_db)):
   return service.get_sample_by_code(db, code)
+
+@router.patch("/by-code/{code}", response_model=SampleResponse)
+def update_sample_tier(code: str, data: SampleTierUpdate, db: Session = Depends(get_db)):
+  return service.update_sample_tier(db, code, data.tier)
 
 @router.delete("/by-code/{code}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_sample_by_code(code: str, db: Session = Depends(get_db)):
