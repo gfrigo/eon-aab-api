@@ -225,9 +225,9 @@ def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
   result = SampleResult(
     sample_id=sample.id,
     image_path=data.gcp_url,
-    confidence_score=1.0,
+    confidence_score=data.confidence if data.confidence is not None else 1.0,
     ml_raw_output={"predicted_class": tier_label, "doctor": data.doctor_name},
-    model_version="operator-v1",
+    model_version=data.model_version or "operator-v1",
     processed_at=now,
   )
   db.add(result)

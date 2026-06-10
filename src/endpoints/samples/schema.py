@@ -15,6 +15,8 @@ class RaspSampleCreate(BaseModel):
   gcp_url: str
   collected_at: datetime
   doctor_name: Optional[str] = None
+  confidence: Optional[float] = None     # confiança do modelo de IA (0-1), quando aplicável
+  model_version: Optional[str] = None    # versão do modelo de IA usado na classificação
 
 class RecentSampleResponse(BaseModel):
   code: str
