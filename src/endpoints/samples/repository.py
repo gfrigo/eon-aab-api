@@ -199,8 +199,14 @@ def get_or_create_daily_batch(db: Session) -> Batch:
 def _generate_sample_code(db: Session) -> str:
   year = datetime.now(timezone.utc).year
   prefix = f"SMP-{year}-"
-  count = db.query(Sample).filter(Sample.code.like(f"{prefix}%")).count()
-  return f"{prefix}{count + 1:03d}"
+  codes = db.query(Sample.code).filter(Sample.code.like(f"{prefix}%")).all()
+  max_num = 0
+  for (code,) in codes:
+    try:
+      max_num = max(max_num, int(code[len(prefix):]))
+    except ValueError:
+      continue
+  return f"{prefix}{max_num + 1:03d}"
 
 def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
   tier_num, tier_label = TIER_MAP.get(data.tier, (None, data.tier))
