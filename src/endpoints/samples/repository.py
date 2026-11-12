@@ -1,19 +1,37 @@
+import calendar
 from datetime import datetime, timezone, timedelta, date as date_type
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from src.endpoints.samples.model import Sample, SampleResult, Batch
 from src.endpoints.samples.schema import SampleCreate, RaspSampleCreate
+from src.endpoints.users.model import User
 
 # Fuso horário do Brasil (UTC-3)
 BRAZIL_TZ = timezone(timedelta(hours=-3))
 
-RASP_USER_ID = 5
+def _device_user_ids(db: Session):
+  """Subquery com os ids de todos os usuários 'dispositivo' (Raspberry Pi cadastradas)."""
+  return db.query(User.id).filter(User.profile == "dispositivo")
 
 TIER_MAP = {
-  "bom":     (1, "bom"),
-  "ruim":    (2, "ruim"),
-  "pessimo": (3, "pessimo"),
+  "bom":      (1, "bom"),
+  "moderado": (2, "moderado"),
+  "ruim":     (3, "ruim"),
+  "pessimo":  (4, "pessimo"),
 }
+
+TIER_INT_TO_LABEL = {1: "bom", 2: "moderado", 3: "ruim", 4: "pessimo"}
+
+def _build_image_url(sample_code: str, result: SampleResult | None) -> str | None:
+  """Monta a URL da foto: serve do banco (image_data) quando disponível,
+  senão cai pro esquema antigo (image_path local ou já em http)."""
+  if not result:
+    return None
+  if result.has_image:
+    return f"/samples/by-code/{sample_code}/image"
+  if result.image_path:
+    return result.image_path if result.image_path.startswith("http") else f"/uploads/{result.image_path}"
+  return None
 
 def get_all(db: Session, skip: int = 0, limit: int = 100) -> list[Sample]:
   return db.query(Sample).offset(skip).limit(limit).all()
@@ -31,10 +49,7 @@ def get_by_code(db: Session, code: str) -> dict | None:
 
   sample, sample_result = result
 
-  image_url = None
-  if sample_result and sample_result.image_path:
-    p = sample_result.image_path
-    image_url = p if p.startswith("http") else f"/uploads/{p}"
+  image_url = _build_image_url(sample.code, sample_result)
 
   prediction = None
   if sample_result and sample_result.ml_raw_output:
@@ -57,16 +72,32 @@ def get_by_code(db: Session, code: str) -> dict | None:
     "model_version": sample_result.model_version if sample_result else None,
   }
 
+def get_sample_image(db: Session, code: str) -> bytes | None:
+  """Busca a foto da amostra guardada no banco (SampleResult.image_data)."""
+  return (
+    db.query(SampleResult.image_data)
+    .join(Sample, Sample.id == SampleResult.sample_id)
+    .filter(Sample.code == code)
+    .scalar()
+  )
+
 def create(db: Session, data: SampleCreate) -> Sample:
   now = datetime.now(timezone.utc)
+  batch_id = data.batch_id
+  if not batch_id:
+    batch_id = get_or_create_manual_batch(db, data.created_by).id
+
+  tier_label = TIER_INT_TO_LABEL.get(data.tier) if data.tier else None
+
   new_sample = Sample(
-    batch_id=data.batch_id,
+    batch_id=batch_id,
     code=data.code,
     created_by=data.created_by,
     collected_at=data.collected_at,
-    tier_label=data.tier_label,
+    tier=data.tier,
+    tier_label=tier_label,
     created_at=now,
-    status="pendente"
+    status="concluido" if data.tier else "pendente",
   )
   db.add(new_sample)
   db.commit()
@@ -98,9 +129,10 @@ def get_dashboard_data(db: Session) -> dict:
   yesterday_reads = db.query(Sample).filter(func.date(Sample.created_at) == yesterday_str).count()
 
   # Contagem por tier (total histórico)
-  tier_bom     = db.query(Sample).filter(Sample.tier == 1).count()
-  tier_ruim    = db.query(Sample).filter(Sample.tier == 2).count()
-  tier_pessimo = db.query(Sample).filter(Sample.tier == 3).count()
+  tier_bom      = db.query(Sample).filter(Sample.tier == 1).count()
+  tier_moderado = db.query(Sample).filter(Sample.tier == 2).count()
+  tier_ruim     = db.query(Sample).filter(Sample.tier == 3).count()
+  tier_pessimo  = db.query(Sample).filter(Sample.tier == 4).count()
 
   # Turno e lote ativo
   now_local  = datetime.now(BRAZIL_TZ)
@@ -158,6 +190,7 @@ def get_dashboard_data(db: Session) -> dict:
           "daily_reads": daily_reads,
           "daily_rejections": daily_rejections,
           "tier_bom": tier_bom,
+          "tier_moderado": tier_moderado,
           "tier_ruim": tier_ruim,
           "tier_pessimo": tier_pessimo,
           "yesterday_reads": yesterday_reads,
@@ -167,7 +200,7 @@ def get_dashboard_data(db: Session) -> dict:
       "recent_samples": recent_samples
   }
 
-def get_or_create_daily_batch(db: Session) -> Batch:
+def get_or_create_daily_batch(db: Session, device_id: int) -> Batch:
   """
   Cria/retorna o lote do turno atual:
     Diurno  (D): 06:00–17:59 (horário Brasil UTC-3)
@@ -190,7 +223,20 @@ def get_or_create_daily_batch(db: Session) -> Batch:
   code = f"RASP-{date_str}-{shift}"
   batch = db.query(Batch).filter(Batch.code == code).first()
   if not batch:
-    batch = Batch(user_id=RASP_USER_ID, code=code, created_at=datetime.now(timezone.utc))
+    batch = Batch(user_id=device_id, code=code, created_at=datetime.now(timezone.utc))
+    db.add(batch)
+    db.commit()
+    db.refresh(batch)
+  return batch
+
+def get_or_create_manual_batch(db: Session, user_id: int) -> Batch:
+  """Lote genérico do dia pra amostras cadastradas manualmente pelo painel
+  (prefixo diferente de RASP- pra não ser confundido com lotes do dispositivo)."""
+  date_str = datetime.now(BRAZIL_TZ).strftime("%Y%m%d")
+  code = f"MANUAL-{date_str}"
+  batch = db.query(Batch).filter(Batch.code == code).first()
+  if not batch:
+    batch = Batch(user_id=user_id, code=code, created_at=datetime.now(timezone.utc))
     db.add(batch)
     db.commit()
     db.refresh(batch)
@@ -208,15 +254,15 @@ def _generate_sample_code(db: Session) -> str:
       continue
   return f"{prefix}{max_num + 1:03d}"
 
-def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
+def create_rasp_sample(db: Session, data: RaspSampleCreate, device: User) -> Sample:
   tier_num, tier_label = TIER_MAP.get(data.tier, (None, data.tier))
-  batch = get_or_create_daily_batch(db)
+  batch = get_or_create_daily_batch(db, device.id)
   now = datetime.now(timezone.utc)
 
   sample = Sample(
     batch_id=batch.id,
     code=_generate_sample_code(db),
-    created_by=RASP_USER_ID,
+    created_by=device.id,
     tier=tier_num,
     tier_label=tier_label,
     status="concluido",
@@ -232,8 +278,46 @@ def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
     sample_id=sample.id,
     image_path=data.gcp_url,
     confidence_score=data.confidence if data.confidence is not None else 1.0,
-    ml_raw_output={"predicted_class": tier_label, "doctor": data.doctor_name},
+    ml_raw_output={"predicted_class": tier_label, "doctor": device.full_name},
     model_version=data.model_version or "operator-v1",
+    processed_at=now,
+  )
+  db.add(result)
+  db.commit()
+
+  return sample
+
+def create_pending_rasp_sample(db: Session, photo_id: str, image_filename: str, image_bytes: bytes, collected_at: datetime, device: User, tier: int | None = None) -> Sample:
+  """Registra uma amostra capturada pelo Rasp. Se o operador já selecionou o
+  grau na tela do kiosk antes de capturar (rótulo manual, não predição de IA),
+  a amostra entra direto como 'concluído' com esse grau. Sem grau informado,
+  fica 'pendente' até um analista avaliar manualmente a foto pelo painel."""
+  batch = get_or_create_daily_batch(db, device.id)
+  now = datetime.now(timezone.utc)
+  tier_label = TIER_INT_TO_LABEL.get(tier) if tier else None
+
+  sample = Sample(
+    batch_id=batch.id,
+    code=_generate_sample_code(db),
+    created_by=device.id,
+    tier=tier,
+    tier_label=tier_label,
+    status="concluido" if tier else "pendente",
+    analyzed_at=now if tier else None,
+    collected_at=collected_at,
+    created_at=now,
+  )
+  db.add(sample)
+  db.commit()
+  db.refresh(sample)
+
+  result = SampleResult(
+    sample_id=sample.id,
+    image_path=image_filename,
+    image_data=image_bytes,
+    confidence_score=None,
+    ml_raw_output={"doctor": device.full_name, "photo_id": photo_id, "predicted_class": tier_label, "source": "operator_grade" if tier else None},
+    model_version=None,
     processed_at=now,
   )
   db.add(result)
@@ -253,7 +337,7 @@ def get_gallery_data(db: Session) -> list[dict]:
     if not result:
       continue
     prediction = result.ml_raw_output.get("predicted_class") if result.ml_raw_output else None
-    image_url = result.image_path if result.image_path.startswith("http") else f"/uploads/{result.image_path}"
+    image_url = _build_image_url(sample.code, result)
     gallery.append({
       "id": sample.id,
       "code": sample.code,
@@ -271,7 +355,7 @@ def get_rasp_status(db: Session) -> dict:
   from datetime import timezone as tz
   last = (
     db.query(Sample)
-    .filter(Sample.created_by == RASP_USER_ID)
+    .filter(Sample.created_by.in_(_device_user_ids(db)))
     .order_by(Sample.created_at.desc())
     .first()
   )
@@ -291,17 +375,14 @@ def get_recent_rasp_samples(db: Session, limit: int = 5) -> list[dict]:
   results = (
     db.query(Sample, SampleResult)
     .outerjoin(SampleResult, SampleResult.sample_id == Sample.id)
-    .filter(Sample.created_by == RASP_USER_ID)
+    .filter(Sample.created_by.in_(_device_user_ids(db)))
     .order_by(Sample.created_at.desc())
     .limit(limit)
     .all()
   )
   items = []
   for sample, result in results:
-    image_url = None
-    if result and result.image_path:
-      p = result.image_path
-      image_url = p if p.startswith("http") else f"/uploads/{p}"
+    image_url = _build_image_url(sample.code, result)
     items.append({
       "code": sample.code,
       "tier_label": sample.tier_label,
@@ -316,21 +397,76 @@ def get_pending_count(db: Session) -> dict:
   pending    = db.query(Sample).filter(Sample.status == "pendente").count()
   return {"processing": processing, "pending": pending, "total": processing + pending}
 
-def get_time_series(db: Session, days: int = 14) -> list[dict]:
-  """Retorna contagem de amostras por dia nos últimos N dias, agrupadas por tier."""
-  today = date_type.today()
+def get_time_series(db: Session, days: int = 14, year: int | None = None, month: int | None = None) -> list[dict]:
+  """Retorna contagem de amostras por dia, agrupadas por tier.
+  Se year/month forem informados, retorna todos os dias daquele mês.
+  Caso contrário, retorna os últimos N dias a partir de hoje."""
+  if year and month:
+    _, last_day = calendar.monthrange(year, month)
+    dates = [date_type(year, month, d) for d in range(1, last_day + 1)]
+  else:
+    today = date_type.today()
+    dates = [today - timedelta(days=i) for i in range(days - 1, -1, -1)]
+
   result = []
-  for i in range(days - 1, -1, -1):
-    d = today - timedelta(days=i)
+  for d in dates:
     d_str = d.strftime('%Y-%m-%d')
-    bom     = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == 1).count()
-    ruim    = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == 2).count()
-    pessimo = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == 3).count()
+    bom      = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == 1).count()
+    moderado = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == 2).count()
+    ruim     = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == 3).count()
+    pessimo  = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == 4).count()
     sem_tier = db.query(Sample).filter(func.date(Sample.created_at) == d_str, Sample.tier == None).count()
     result.append({
       "date": d_str,
-      "total": bom + ruim + pessimo + sem_tier,
+      "total": bom + moderado + ruim + pessimo + sem_tier,
       "bom": bom,
+      "moderado": moderado,
+      "ruim": ruim,
+      "pessimo": pessimo,
+    })
+  return result
+
+def get_time_series_monthly(db: Session, year: int | None = None) -> list[dict]:
+  """Retorna contagem de amostras por mês, agrupadas por tier, de janeiro a dezembro do ano informado
+  (ou do ano atual, se não informado)."""
+  if year is None:
+    year = date_type.today().year
+  buckets = [(year, m) for m in range(1, 13)]
+
+  result = []
+  for y, m in buckets:
+    _, last_day = calendar.monthrange(y, m)
+    start_str = date_type(y, m, 1).strftime('%Y-%m-%d')
+    end_str   = date_type(y, m, last_day).strftime('%Y-%m-%d')
+    bom      = db.query(Sample).filter(func.date(Sample.created_at) >= start_str, func.date(Sample.created_at) <= end_str, Sample.tier == 1).count()
+    moderado = db.query(Sample).filter(func.date(Sample.created_at) >= start_str, func.date(Sample.created_at) <= end_str, Sample.tier == 2).count()
+    ruim     = db.query(Sample).filter(func.date(Sample.created_at) >= start_str, func.date(Sample.created_at) <= end_str, Sample.tier == 3).count()
+    pessimo  = db.query(Sample).filter(func.date(Sample.created_at) >= start_str, func.date(Sample.created_at) <= end_str, Sample.tier == 4).count()
+    sem_tier = db.query(Sample).filter(func.date(Sample.created_at) >= start_str, func.date(Sample.created_at) <= end_str, Sample.tier == None).count()
+    result.append({
+      "date": f"{y:04d}-{m:02d}",
+      "total": bom + moderado + ruim + pessimo + sem_tier,
+      "bom": bom,
+      "moderado": moderado,
+      "ruim": ruim,
+      "pessimo": pessimo,
+    })
+  return result
+
+def get_time_series_hourly(db: Session, target_date: str) -> list[dict]:
+  """Retorna contagem de amostras por hora (0-23h) de um dia específico, agrupadas por tier."""
+  result = []
+  for h in range(24):
+    bom      = db.query(Sample).filter(func.date(Sample.created_at) == target_date, func.hour(Sample.created_at) == h, Sample.tier == 1).count()
+    moderado = db.query(Sample).filter(func.date(Sample.created_at) == target_date, func.hour(Sample.created_at) == h, Sample.tier == 2).count()
+    ruim     = db.query(Sample).filter(func.date(Sample.created_at) == target_date, func.hour(Sample.created_at) == h, Sample.tier == 3).count()
+    pessimo  = db.query(Sample).filter(func.date(Sample.created_at) == target_date, func.hour(Sample.created_at) == h, Sample.tier == 4).count()
+    sem_tier = db.query(Sample).filter(func.date(Sample.created_at) == target_date, func.hour(Sample.created_at) == h, Sample.tier == None).count()
+    result.append({
+      "date": f"{target_date}T{h:02d}",
+      "total": bom + moderado + ruim + pessimo + sem_tier,
+      "bom": bom,
+      "moderado": moderado,
       "ruim": ruim,
       "pessimo": pessimo,
     })
@@ -341,7 +477,7 @@ def get_rasp_log(db: Session, limit: int = 20) -> list[dict]:
   results = (
     db.query(Sample, SampleResult)
     .outerjoin(SampleResult, SampleResult.sample_id == Sample.id)
-    .filter(Sample.created_by == RASP_USER_ID)
+    .filter(Sample.created_by.in_(_device_user_ids(db)))
     .order_by(Sample.created_at.desc())
     .limit(limit)
     .all()
@@ -351,10 +487,7 @@ def get_rasp_log(db: Session, limit: int = 20) -> list[dict]:
     doctor = None
     if result and result.ml_raw_output:
       doctor = result.ml_raw_output.get("doctor")
-    image_url = None
-    if result and result.image_path:
-      p = result.image_path
-      image_url = p if p.startswith("http") else f"/uploads/{p}"
+    image_url = _build_image_url(sample.code, result)
     items.append({
       "code": sample.code,
       "tier": sample.tier,
@@ -377,14 +510,16 @@ def get_doctor_stats(db: Session) -> list[dict]:
         counts[doc] = counts.get(doc, 0) + 1
   return [{"doctor": k, "count": v} for k, v in sorted(counts.items(), key=lambda x: -x[1])]
 
-TIER_INT_TO_LABEL = {1: "bom", 2: "ruim", 3: "pessimo"}
-
 def update_tier(db: Session, code: str, tier: int) -> Sample | None:
   sample = db.query(Sample).filter(Sample.code == code).first()
   if not sample:
     return None
   sample.tier = tier
   sample.tier_label = TIER_INT_TO_LABEL.get(tier, str(tier))
+  # amostra pendente de avaliação manual: ao receber o grau, vira concluída
+  if sample.status == "pendente":
+    sample.status = "concluido"
+    sample.analyzed_at = datetime.now(timezone.utc)
   db.commit()
   db.refresh(sample)
   return sample

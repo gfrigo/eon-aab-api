@@ -31,14 +31,29 @@ def get_rasp_status(db: Session) -> dict:
 def get_pending_count(db: Session) -> dict:
   return repository.get_pending_count(db)
 
-def create_rasp_sample(db: Session, data: RaspSampleCreate) -> Sample:
-  return repository.create_rasp_sample(db, data)
+def create_rasp_sample(db: Session, data: RaspSampleCreate, device) -> Sample:
+  return repository.create_rasp_sample(db, data, device)
+
+def create_pending_rasp_sample(db: Session, photo_id: str, image_filename: str, image_bytes: bytes, collected_at, device, tier: int | None = None) -> Sample:
+  return repository.create_pending_rasp_sample(db, photo_id, image_filename, image_bytes, collected_at, device, tier)
+
+def get_sample_image(db: Session, code: str) -> bytes:
+  image = repository.get_sample_image(db, code)
+  if image is None:
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Imagem não encontrada.")
+  return image
 
 def get_recent_rasp_samples(db: Session) -> list:
   return repository.get_recent_rasp_samples(db)
 
-def get_time_series(db: Session, days: int = 14) -> list:
-  return repository.get_time_series(db, days)
+def get_time_series(db: Session, days: int = 14, year: int | None = None, month: int | None = None) -> list:
+  return repository.get_time_series(db, days, year, month)
+
+def get_time_series_monthly(db: Session, year: int | None = None) -> list:
+  return repository.get_time_series_monthly(db, year)
+
+def get_time_series_hourly(db: Session, target_date: str) -> list:
+  return repository.get_time_series_hourly(db, target_date)
 
 def get_rasp_log(db: Session, limit: int = 20) -> list:
   return repository.get_rasp_log(db, limit)

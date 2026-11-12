@@ -3,18 +3,17 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 class SampleCreate(BaseModel):
-  batch_id: int
   code: str
   created_by: int
   collected_at: datetime
-  tier_label: Optional[str] = None
+  tier: Optional[int] = None  # grau 1 a 4, opcional na criação manual
+  batch_id: Optional[int] = None  # se omitido, resolve automaticamente pelo lote do turno atual
 
 class RaspSampleCreate(BaseModel):
   photo_id: str
   tier: str          # "bom" | "ruim" | "pessimo"
   gcp_url: str
   collected_at: datetime
-  doctor_name: Optional[str] = None
   confidence: Optional[float] = None     # confiança do modelo de IA (0-1), quando aplicável
   model_version: Optional[str] = None    # versão do modelo de IA usado na classificação
 
@@ -63,7 +62,7 @@ class GalleryItemResponse(BaseModel):
   status: str
   confidence_score: Optional[float] = None
   prediction: Optional[str] = None
-  image_url: str
+  image_url: Optional[str] = None
   processed_at: datetime
 
 class RaspStatusResponse(BaseModel):
@@ -80,6 +79,7 @@ class TimeSeriesItem(BaseModel):
   date: str
   total: int
   bom: int
+  moderado: int
   ruim: int
   pessimo: int
 
@@ -93,7 +93,7 @@ class RaspLogItem(BaseModel):
   created_at: datetime
 
 class SampleTierUpdate(BaseModel):
-  tier: int  # 1, 2 ou 3
+  tier: int  # 1, 2, 3 ou 4
 
 class DashboardStatsResponse(BaseModel):
   processed_samples: int
@@ -103,6 +103,7 @@ class DashboardStatsResponse(BaseModel):
   daily_reads: int
   daily_rejections: int
   tier_bom: int = 0
+  tier_moderado: int = 0
   tier_ruim: int = 0
   tier_pessimo: int = 0
   yesterday_reads: int = 0

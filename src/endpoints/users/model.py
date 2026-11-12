@@ -25,9 +25,10 @@ class User(Base):
   password: Mapped[str] = mapped_column(String(255), nullable=False)
   full_name: Mapped[str] = mapped_column(String(100), nullable=False)
   profile: Mapped[str] = mapped_column(
-      Enum("admin", "analista", "visualizador"), nullable=False
+      Enum("admin", "analista", "visualizador", "dispositivo"), nullable=False
   )
   is_active: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+  api_token: Mapped[str | None] = mapped_column(String(255), nullable=True)
   created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
   updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 

@@ -3,7 +3,7 @@ CREATE TABLE `Samples` (
   `batch_id` int unsigned NOT NULL,
   `code` varchar(20) NOT NULL,
   `created_by` int unsigned NOT NULL,
-  `tier` tinyint NULL CHECK (`tier` IN (1, 2, 3)),
+  `tier` tinyint NULL CHECK (`tier` IN (1, 2, 3, 4)),
   `tier_label` varchar(20) NULL,
   `status` enum('pendente','processando','concluido','rejeitado') NOT NULL DEFAULT 'pendente',
   `collected_at` datetime NOT NULL,

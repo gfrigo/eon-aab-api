@@ -15,6 +15,11 @@ class Settings(BaseSettings):
   DB_SCHEMA: str | None = None
   DB_PORT: int | None = 3306
 
+  # Obrigatórias via ambiente (.env local / variáveis do Cloud Run) — nunca no código.
+  SECRET_KEY: str
+  ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 dias
+  TOKEN_ENCRYPTION_KEY: str
+
   @property
   def database_url(self) -> str:
     return f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_SCHEMA}"

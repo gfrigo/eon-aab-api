@@ -1,21 +1,34 @@
 from datetime import datetime, timezone
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.endpoints.users.model import User
-from src.endpoints.users.schema import UserCreate
 
 def get_user_by_email(db:Session, email:str) -> User | None:
   return db.query(User).filter(User.email == email).first()
 
-def create_user(db:Session, data:UserCreate, hashed_password:str) -> User:
+def get_user_by_id(db:Session, user_id:int) -> User | None:
+  return db.query(User).filter(User.id == user_id).first()
+
+def set_api_token(db:Session, user_id:int, api_token:str | None) -> User | None:
+  user = db.query(User).filter(User.id == user_id).first()
+  if not user: return None
+  user.api_token = api_token
+  user.updated_at = datetime.now(timezone.utc)
+  db.commit()
+  db.refresh(user)
+  return user
+
+def create_user(db:Session, email:str, full_name:str, profile:str, hashed_password:str, api_token:str | None) -> User:
   now = datetime.now(timezone.utc)
 
   user = User(
-    email=data.email,
+    email=email,
     password=hashed_password,
-    full_name=data.full_name,
-    profile=data.profile,
+    full_name=full_name,
+    profile=profile,
     is_active=1,
+    api_token=api_token,
     created_at=now,
     updated_at=now,
   )
@@ -45,8 +58,12 @@ def update_user(db: Session, user_id: int, data: dict) -> User | None:
 def delete_user(db: Session, user_id: int) -> bool:
   user = db.query(User).filter(User.id == user_id).first()
   if not user: return False
-  db.delete(user)
-  db.commit()
+  try:
+    db.delete(user)
+    db.commit()
+  except IntegrityError:
+    db.rollback()
+    raise ValueError("Não é possível excluir: existem lotes ou amostras vinculados a este usuário. Desative-o em vez de excluir.")
   return True
 
 def update_avatar(db: Session, user_id: int, avatar_url: str):
